@@ -60,15 +60,27 @@ function computeStreakFromTasks(tasks) {
   return { current_streak: currentStreak, longest_streak: longestStreak };
 }
 
+// Helper to fetch user tasks filtered by authenticated user_id
+async function fetchUserTasks() {
+  if (isDemoMode) return getDemoTasks();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return [];
+  const { data } = await supabase.from('tasks').select('*').eq('user_id', user.id);
+  return data || [];
+}
+
 // ─── Calculate Goal Time Stats from Tasks ────────────────────────────────────
 export async function getGoalTimeStats() {
   let tasks = [];
   if (isDemoMode) {
     tasks = getDemoTasks();
   } else {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return { data: {}, error: null };
     const { data } = await supabase
       .from('tasks')
       .select('goal_id, duration_minutes, is_completed')
+      .eq('user_id', user.id)
       .not('goal_id', 'is', null);
     tasks = data || [];
   }
@@ -93,13 +105,7 @@ export async function getGoalTimeStats() {
 
 // ─── Get Time Allocation Bar Data by Timeframe & Category ────────────────────
 export async function getTimeRangeBarData(timeframe = '1m', categoryId = 'all') {
-  let tasks = [];
-  if (isDemoMode) {
-    tasks = getDemoTasks();
-  } else {
-    const { data } = await supabase.from('tasks').select('*');
-    tasks = data || [];
-  }
+  const tasks = await fetchUserTasks();
 
   let filtered = tasks.filter(t => t.is_completed);
   if (categoryId && categoryId !== 'all') {
@@ -164,11 +170,8 @@ export async function getRadarData(days = 30) {
     const { data: catRes } = await getCategories();
     categories = catRes && catRes.length > 0 ? catRes : DEMO_CATEGORIES;
   } else {
-    const [{ data: tRes }, { data: catRes }] = await Promise.all([
-      supabase.from('tasks').select('*'),
-      supabase.from('categories').select('*'),
-    ]);
-    tasks = tRes || [];
+    const { data: catRes } = await getCategories();
+    tasks = await fetchUserTasks();
     categories = catRes && catRes.length > 0 ? catRes : DEMO_CATEGORIES;
   }
 
@@ -182,19 +185,18 @@ export async function getRadarData(days = 30) {
     return { cat, hrs, mins };
   });
 
-  const totalHoursAll = rawData.reduce((acc, d) => acc + d.hrs, 0) || 1;
-  const maxHrs = Math.max(...rawData.map(d => d.hrs)) || 1;
+  const totalHoursAll = rawData.reduce((acc, d) => acc + d.hrs, 0);
+  const maxHrs = Math.max(...rawData.map(d => d.hrs)) || 0;
 
   const data = rawData.map(({ cat, hrs }) => {
-    const percent = Math.round((hrs / totalHoursAll) * 100);
-    // Relative scaling: largest category gets 100%, others scale relative to max (min baseline 15%)
-    const relativeValue = Math.max(15, Math.round((hrs / maxHrs) * 100));
+    const percent = totalHoursAll > 0 ? Math.round((hrs / totalHoursAll) * 100) : 0;
+    const relativeValue = maxHrs > 0 ? Math.max(15, Math.round((hrs / maxHrs) * 100)) : 0;
     const avgMins = Math.round((hrs * 60) / activeDays);
 
     return {
       category: `${cat.icon || '📌'} ${cat.name}`,
       category_id: cat.id,
-      value: relativeValue, // Relative visual scaling for full expanse
+      value: relativeValue,
       totalHours: hrs,
       percent: percent,
       avgMins: avgMins,
@@ -207,38 +209,23 @@ export async function getRadarData(days = 30) {
 
 // ─── Public API ──────────────────────────────────────────────────────────────
 export async function getStreakData() {
-  if (isDemoMode) {
-    return { data: computeStreakFromTasks(getDemoTasks()), error: null };
-  }
-  const { data: tasks } = await supabase.from('tasks').select('*');
-  return { data: computeStreakFromTasks(tasks || []), error: null };
+  const tasks = await fetchUserTasks();
+  return { data: computeStreakFromTasks(tasks), error: null };
 }
 
 export async function getHeatmapData(days = 90) {
-  if (isDemoMode) {
-    return { data: calculateHeatmapFromTasks(getDemoTasks()), error: null };
-  }
-  const { data: tasks } = await supabase.from('tasks').select('*');
-  return { data: calculateHeatmapFromTasks(tasks || [], days), error: null };
+  const tasks = await fetchUserTasks();
+  return { data: calculateHeatmapFromTasks(tasks, days), error: null };
 }
 
 export async function getTimeOfDayData() {
-  if (isDemoMode) {
-    return { data: calculateTimeOfDayFromTasks(getDemoTasks()), error: null };
-  }
-  const { data: tasks } = await supabase.from('tasks').select('*');
-  return { data: calculateTimeOfDayFromTasks(tasks || []), error: null };
+  const tasks = await fetchUserTasks();
+  return { data: calculateTimeOfDayFromTasks(tasks), error: null };
 }
 
 export async function getStackedBarData(weeks = 8) {
   const weeksData = [];
-  let tasks = [];
-  if (isDemoMode) {
-    tasks = getDemoTasks();
-  } else {
-    const { data } = await supabase.from('tasks').select('*');
-    tasks = data || [];
-  }
+  const tasks = await fetchUserTasks();
 
   for (let w = weeks - 1; w >= 0; w--) {
     const weekLabel = `T${weeks - w}`;
@@ -254,12 +241,13 @@ export async function getStackedBarData(weeks = 8) {
 }
 
 export async function getHabitStrength() {
-  let tasks = [];
-  if (isDemoMode) {
-    tasks = getDemoTasks();
-  } else {
-    const { data } = await supabase.from('tasks').select('*');
-    tasks = data || [];
+  const tasks = await fetchUserTasks();
+
+  if (tasks.length === 0) {
+    return {
+      data: { score: 0, consistencyRate: 0, rolloverRate: 0 },
+      error: null,
+    };
   }
 
   const completed = tasks.filter(t => t.is_completed).length;
@@ -276,20 +264,14 @@ export async function getHabitStrength() {
 }
 
 export async function getSummaryStats() {
-  let tasks = [];
-  if (isDemoMode) {
-    tasks = getDemoTasks();
-  } else {
-    const { data } = await supabase.from('tasks').select('*');
-    tasks = data || [];
-  }
+  const tasks = await fetchUserTasks();
 
   const streak = computeStreakFromTasks(tasks);
   const completed = tasks.filter(t => t.is_completed).length;
   const total = tasks.length || 1;
-  const weeklyCompletion = Math.round((completed / total) * 100);
+  const weeklyCompletion = total > 0 ? Math.round((completed / total) * 100) : 0;
   const rolloverCount = tasks.reduce((acc, t) => acc + (t.rollover_count || 0), 0);
-  const delayScore = Number((rolloverCount / total).toFixed(1)) || 0;
+  const delayScore = total > 0 ? Number((rolloverCount / total).toFixed(1)) : 0;
 
   return {
     data: {
