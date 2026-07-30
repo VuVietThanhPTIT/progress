@@ -160,6 +160,63 @@ export async function getTimeRangeBarData(timeframe = '1m', categoryId = 'all') 
   return { data: result, error: null };
 }
 
+// ─── Task Execution Count Line Chart Data (Counts number of completed tasks) ───
+export async function getTaskExecutionLineData(timeframe = '1m', categoryId = 'all') {
+  const tasks = await fetchUserTasks();
+
+  let filtered = tasks.filter(t => t.is_completed);
+  if (categoryId && categoryId !== 'all') {
+    filtered = filtered.filter(t => t.category_id === categoryId);
+  }
+
+  const today = new Date();
+  const result = [];
+
+  if (timeframe === '1w') {
+    for (let i = 6; i >= 0; i--) {
+      const d = subDays(today, i);
+      const dateStr = format(d, 'yyyy-MM-dd');
+      const label = format(d, 'EE dd/MM', { locale: vi });
+      const count = filtered.filter(t => t.date === dateStr).length;
+      result.push({ label, count, date: dateStr });
+    }
+  } else if (timeframe === '1m') {
+    for (let i = 29; i >= 0; i--) {
+      const d = subDays(today, i);
+      const dateStr = format(d, 'yyyy-MM-dd');
+      const label = format(d, 'dd/MM');
+      const count = filtered.filter(t => t.date === dateStr).length;
+      result.push({ label, count, date: dateStr });
+    }
+  } else if (timeframe === '6m') {
+    for (let i = 5; i >= 0; i--) {
+      const d = new Date(today.getFullYear(), today.getMonth() - i, 1);
+      const label = `Thg ${d.getMonth() + 1}`;
+      const monthPrefix = format(d, 'yyyy-MM');
+      const count = filtered.filter(t => t.date && t.date.startsWith(monthPrefix)).length;
+      result.push({ label, count });
+    }
+  } else {
+    for (let i = 11; i >= 0; i--) {
+      const d = new Date(today.getFullYear(), today.getMonth() - i, 1);
+      const label = `T${d.getMonth() + 1}`;
+      const monthPrefix = format(d, 'yyyy-MM');
+      const count = filtered.filter(t => t.date && t.date.startsWith(monthPrefix)).length;
+      result.push({ label, count });
+    }
+  }
+
+  const totalExecutions = result.reduce((acc, r) => acc + r.count, 0);
+  const maxExecutions = Math.max(...result.map(r => r.count), 0);
+  const avgExecutions = result.length > 0 ? Number((totalExecutions / result.length).toFixed(1)) : 0;
+
+  return {
+    data: result,
+    stats: { totalExecutions, maxExecutions, avgExecutions },
+    error: null
+  };
+}
+
 // ─── Minimal Ultra-Clean Radar Data (Relative Time Correlation per Category) ───
 export async function getRadarData(days = 30) {
   let tasks = [];
