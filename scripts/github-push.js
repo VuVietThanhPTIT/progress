@@ -30,6 +30,9 @@ const defaultFiles = [
   'src/api/tasks.js',
   'src/api/goals.js',
   'src/api/visualization.js',
+  'src/api/icsParser.js',
+  'src/components/visualization/VisPage.jsx',
+  'src/components/settings/SettingsPage.jsx',
   'package.json'
 ];
 
