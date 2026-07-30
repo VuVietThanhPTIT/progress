@@ -1,15 +1,19 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { updatePassword, deleteAccount } from '../../api/auth';
+import { parseICS } from '../../api/icsParser';
+import { importTasksBatch } from '../../api/tasks';
+import { getCategories, DEMO_CATEGORIES } from '../../api/goals';
 
 const DEFAULT_BG = 'https://images.unsplash.com/photo-1517694712202-14dd9538aa97?auto=format&fit=crop&w=1200&q=80';
 const PRESET_WALLPAPERS = [
-  { name: 'Góc làm việc Aesthetic', url: '/login_bg.png' },
-  { name: 'Dark Minimalist Workspace', url: 'https://images.unsplash.com/photo-1517694712202-14dd9538aa97?auto=format&fit=crop&w=1200&q=80' },
+  { name: 'Góc làm việc Aesthetic', url: 'https://images.unsplash.com/photo-1517694712202-14dd9538aa97?auto=format&fit=crop&w=1200&q=80' },
+  { name: 'Dark Minimalist Workspace', url: 'https://images.unsplash.com/photo-1507238691740-187a5b1d37b8?auto=format&fit=crop&w=1200&q=80' },
   { name: 'Thiên nhiên Rừng xanh', url: 'https://images.unsplash.com/photo-1448375240586-882707db888b?auto=format&fit=crop&w=1200&q=80' },
   { name: 'Cyberpunk Neon', url: 'https://images.unsplash.com/photo-1518709268805-4e9042af9f23?auto=format&fit=crop&w=1200&q=80' },
 ];
 
+// ─── Login Background Customization ──────────────────────────────────────────
 function LoginBgSection() {
   const [bgUrl, setBgUrl] = useState(() => localStorage.getItem('focusledger_auth_bg') || DEFAULT_BG);
   const [inputUrl, setInputUrl] = useState('');
@@ -48,7 +52,6 @@ function LoginBgSection() {
         <div className="auth-alert success" style={{ marginBottom: 16 }}>{savedMsg}</div>
       )}
 
-      {/* Preview box */}
       <div style={{ marginBottom: 16 }}>
         <label className="form-label">Xem trước ảnh nền hiện tại:</label>
         <div style={{ height: 140, borderRadius: 12, overflow: 'hidden', border: '1px solid var(--border-medium)', position: 'relative' }}>
@@ -56,7 +59,6 @@ function LoginBgSection() {
         </div>
       </div>
 
-      {/* Paste URL */}
       <div className="form-group" style={{ marginBottom: 16 }}>
         <label className="form-label">Dán đường dẫn ảnh tùy chỉnh (URL):</label>
         <div style={{ display: 'flex', gap: 8 }}>
@@ -70,13 +72,11 @@ function LoginBgSection() {
         </div>
       </div>
 
-      {/* Upload file */}
       <div className="form-group" style={{ marginBottom: 16 }}>
         <label className="form-label">Hoặc Tải ảnh trực tiếp từ Máy tính:</label>
         <input type="file" accept="image/*" className="input" onChange={handleFileUpload} />
       </div>
 
-      {/* Presets */}
       <div>
         <label className="form-label">Hoặc Chọn từ Bộ sưu tập mẫu có sẵn:</label>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginTop: 8 }}>
@@ -107,6 +107,156 @@ function LoginBgSection() {
   );
 }
 
+// ─── iCalendar (.ics) Schedule Importer ──────────────────────────────────────
+function IcsImportSection() {
+  const [icsText, setIcsText] = useState('');
+  const [parsedEvents, setParsedEvents] = useState([]);
+  const [categories, setCategories] = useState(DEMO_CATEGORIES);
+  const [selectedCatId, setSelectedCatId] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [msg, setMsg] = useState({ type: '', text: '' });
+
+  useEffect(() => {
+    getCategories().then(({ data }) => {
+      if (data && data.length > 0) {
+        setCategories(data);
+        setSelectedCatId(data[0].id);
+      }
+    });
+  }, []);
+
+  const handleFileUpload = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (evt) => {
+      const text = evt.target?.result;
+      if (text) {
+        setIcsText(text);
+        const events = parseICS(text);
+        setParsedEvents(events);
+        setMsg({ type: 'success', text: `✓ Đã đọc được ${events.length} lịch học từ file .ics` });
+      }
+    };
+    reader.readAsText(file);
+  };
+
+  const handleTextChange = (text) => {
+    setIcsText(text);
+    if (text.includes('BEGIN:VCALENDAR')) {
+      const events = parseICS(text);
+      setParsedEvents(events);
+      setMsg({ type: 'success', text: `✓ Đã phân tích ${events.length} lịch học!` });
+    } else {
+      setParsedEvents([]);
+      setMsg({ type: '', text: '' });
+    }
+  };
+
+  const handleImportAll = async () => {
+    if (parsedEvents.length === 0) return;
+    setLoading(true);
+
+    const tasksToInsert = parsedEvents.map(e => ({
+      ...e,
+      category_id: selectedCatId || (categories[0]?.id || 'cat-1'),
+    }));
+
+    const res = await importTasksBatch(tasksToInsert);
+    setLoading(false);
+
+    if (res?.error) {
+      setMsg({ type: 'error', text: `Không thể import lịch: ${res.error.message || 'Thử lại sau'}` });
+    } else {
+      setMsg({ type: 'success', text: `🎉 Đã import thành công ${parsedEvents.length} môn học vào lịch công việc!` });
+      setParsedEvents([]);
+      setIcsText('');
+    }
+  };
+
+  return (
+    <div className="card" style={{ marginBottom: 'var(--space-5)' }}>
+      <h3 style={{ marginBottom: 'var(--space-3)', fontSize: 16, display: 'flex', alignItems: 'center', gap: 8 }}>
+        📅 Import Thời Khóa Biểu & Lịch Học (.ics)
+      </h3>
+      <p style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 16 }}>
+        Tải tệp file `.ics` (iCalendar từ QLĐT PTIT / Google Calendar) hoặc dán mã lịch để tự động đưa các môn học vào danh sách Task hàng ngày!
+      </p>
+
+      {msg.text && (
+        <div className={`auth-alert ${msg.type}`} style={{ marginBottom: 16 }}>
+          {msg.text}
+        </div>
+      )}
+
+      {/* Upload file */}
+      <div className="form-group" style={{ marginBottom: 16 }}>
+        <label className="form-label">📁 Chọn file .ics từ máy tính:</label>
+        <input type="file" accept=".ics,text/calendar" className="input" onChange={handleFileUpload} />
+      </div>
+
+      {/* Paste text */}
+      <div className="form-group" style={{ marginBottom: 16 }}>
+        <label className="form-label">Hoặc Dán trực tiếp nội dung file .ics:</label>
+        <textarea
+          className="input"
+          rows={4}
+          placeholder="BEGIN:VCALENDAR&#10;BEGIN:VEVENT&#10;SUMMARY:Nhập môn công nghệ phần mềm...&#10;END:VEVENT"
+          value={icsText}
+          onChange={e => handleTextChange(e.target.value)}
+        />
+      </div>
+
+      {/* Select Category */}
+      {parsedEvents.length > 0 && (
+        <div className="form-group" style={{ marginBottom: 16 }}>
+          <label className="form-label">Gắn tất cả môn học này vào Danh mục:</label>
+          <select
+            className="input"
+            value={selectedCatId}
+            onChange={e => setSelectedCatId(e.target.value)}
+          >
+            {categories.map(c => (
+              <option key={c.id} value={c.id}>{c.icon} {c.name}</option>
+            ))}
+          </select>
+        </div>
+      )}
+
+      {/* Preview list */}
+      {parsedEvents.length > 0 && (
+        <div style={{ marginBottom: 16 }}>
+          <label className="form-label">Danh sách {parsedEvents.length} môn học sẽ được Import:</label>
+          <div style={{ maxHeight: 200, overflowY: 'auto', border: '1px solid var(--border-medium)', borderRadius: 8, padding: 8, background: '#f9f9f9', display: 'flex', flexDirection: 'column', gap: 6 }}>
+            {parsedEvents.map((ev, idx) => (
+              <div key={idx} style={{ background: '#fff', border: '1px solid var(--border-subtle)', borderRadius: 6, padding: '6px 10px', fontSize: 12 }}>
+                <div style={{ fontWeight: 700, color: 'var(--text-primary)' }}>{ev.title}</div>
+                <div style={{ fontSize: 11, color: 'var(--text-muted)', display: 'flex', gap: 10, marginTop: 2, flexWrap: 'wrap' }}>
+                  <span>📅 {ev.date}</span>
+                  <span>⏰ {ev.start_time} ({ev.duration_minutes}p)</span>
+                  {ev.location && <span style={{ color: 'var(--accent-primary)', fontWeight: 600 }}>📍 {ev.location}</span>}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {parsedEvents.length > 0 && (
+        <button
+          className="btn btn-primary"
+          onClick={handleImportAll}
+          disabled={loading}
+          style={{ width: '100%', justifyContent: 'center' }}
+        >
+          {loading ? '⏳ Đang Import...' : `📥 Import ${parsedEvents.length} môn học vào Lịch`}
+        </button>
+      )}
+    </div>
+  );
+}
+
+// ─── Main Settings Page ───────────────────────────────────────────────────────
 export default function SettingsPage() {
   const { user, signOut } = useAuth();
   const [newPw, setNewPw] = useState('');
@@ -145,7 +295,7 @@ export default function SettingsPage() {
         <div className="page-header">
           <div className="page-title-group">
             <h1 className="page-title">⚙️ Cài đặt tài khoản</h1>
-            <p className="page-subtitle">Quản lý thông tin, ảnh nền và bảo mật tài khoản</p>
+            <p className="page-subtitle">Quản lý thông tin, ảnh nền, thời khóa biểu và bảo mật</p>
           </div>
         </div>
 
@@ -164,6 +314,9 @@ export default function SettingsPage() {
             ℹ️ Thay đổi email và tên hiển thị thông qua provider đăng nhập (Google hoặc Supabase Dashboard).
           </p>
         </div>
+
+        {/* .ics Schedule Importer */}
+        <IcsImportSection />
 
         {/* Login Background Customization */}
         <LoginBgSection />
