@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import {
   RadarChart as ReRadar, Radar, PolarGrid, PolarAngleAxis, PolarRadiusAxis, ResponsiveContainer, Tooltip,
-  BarChart, Bar, XAxis, YAxis, CartesianGrid
+  BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid
 } from 'recharts';
 import {
-  getRadarData, getGoalTimeStats, getTimeRangeBarData
+  getRadarData, getGoalTimeStats, getTimeRangeBarData, getTaskExecutionLineData
 } from '../../api/visualization';
 import { getCategories, createCategory, deleteCategory, getAllGoals, DEMO_CATEGORIES } from '../../api/goals';
 import '../../styles/visualization.css';
@@ -400,7 +400,117 @@ function RadarChartComp({ data }) {
   );
 }
 
+// ─── Biểu đồ Đường: Thống kê SỐ LẦN thực hiện công việc (Count executions) ──────
+function TaskExecutionLineSection({ categories, selectedCatId }) {
+  const [timeframe, setTimeframe] = useState('1m'); // '1w' | '1m' | '6m' | '1y'
+  const [lineData, setLineData] = useState([]);
+  const [stats, setStats] = useState({ totalExecutions: 0, maxExecutions: 0, avgExecutions: 0 });
+  const [loading, setLoading] = useState(false);
 
+  useEffect(() => {
+    let isMounted = true;
+    setLoading(true);
+    getTaskExecutionLineData(timeframe, selectedCatId).then(({ data, stats: s }) => {
+      if (isMounted) {
+        setLineData(data || []);
+        setStats(s || { totalExecutions: 0, maxExecutions: 0, avgExecutions: 0 });
+        setLoading(false);
+      }
+    });
+    return () => { isMounted = false; };
+  }, [timeframe, selectedCatId]);
+
+  const activeCategory = categories.find(c => c.id === selectedCatId);
+  const strokeColor = activeCategory?.color || '#5b6ec7';
+
+  return (
+    <div className="chart-card" style={{ marginTop: 24 }}>
+      <div className="chart-card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 12 }}>
+        <div>
+          <div className="chart-card-title" style={{ fontSize: 18, fontWeight: 800, display: 'flex', alignItems: 'center', gap: 8 }}>
+            📈 Xu hướng Số Lần Thực Hiện Công Việc (Task Completions)
+          </div>
+          <div className="chart-card-desc">
+            Thống kê <strong style={{ color: strokeColor }}>số lần (số lượt) hoàn thành công việc</strong> — đếm theo số lượng task đã làm, không tính theo tổng số giờ
+          </div>
+        </div>
+
+        {/* Timeframe filter pills */}
+        <div style={{ display: 'flex', gap: 6, background: 'var(--bg-secondary)', padding: '4px', borderRadius: '10px', border: '1px solid var(--border-subtle)' }}>
+          {[
+            { id: '1w', label: '1 Tuần' },
+            { id: '1m', label: '1 Tháng' },
+            { id: '6m', label: '6 Tháng' },
+            { id: '1y', label: '1 Năm' },
+          ].map(tf => (
+            <button
+              key={tf.id}
+              className="btn btn-sm"
+              style={{
+                fontSize: 12, padding: '5px 14px', borderRadius: 6, fontWeight: 700,
+                background: timeframe === tf.id ? strokeColor : 'transparent',
+                color: timeframe === tf.id ? '#fff' : 'var(--text-secondary)',
+                boxShadow: timeframe === tf.id ? '0 2px 4px rgba(0,0,0,0.15)' : 'none',
+                border: 'none',
+                cursor: 'pointer',
+                transition: 'all 0.2s ease',
+              }}
+              onClick={() => setTimeframe(tf.id)}
+            >
+              {tf.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Summary KPI Badges */}
+      <div style={{ display: 'flex', gap: 16, marginTop: 16, marginBottom: 12, flexWrap: 'wrap' }}>
+        <div style={{ background: 'rgba(91,110,199,0.08)', padding: '10px 16px', borderRadius: 10, border: '1px solid rgba(91,110,199,0.15)', flex: 1, minWidth: 140 }}>
+          <div style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 600 }}>TỔNG SỐ LẦN HOÀN THÀNH</div>
+          <div style={{ fontSize: 20, fontWeight: 800, color: strokeColor, marginTop: 2 }}>{stats.totalExecutions} <span style={{ fontSize: 12, fontWeight: 500 }}>lượt</span></div>
+        </div>
+        <div style={{ background: 'rgba(16,185,129,0.08)', padding: '10px 16px', borderRadius: 10, border: '1px solid rgba(16,185,129,0.15)', flex: 1, minWidth: 140 }}>
+          <div style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 600 }}>TRUNG BÌNH MỖI MỐC</div>
+          <div style={{ fontSize: 20, fontWeight: 800, color: '#10b981', marginTop: 2 }}>{stats.avgExecutions} <span style={{ fontSize: 12, fontWeight: 500 }}>lượt/mốc</span></div>
+        </div>
+        <div style={{ background: 'rgba(245,158,11,0.08)', padding: '10px 16px', borderRadius: 10, border: '1px solid rgba(245,158,11,0.15)', flex: 1, minWidth: 140 }}>
+          <div style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 600 }}>KỶ LỤC MỐC CAO NHẤT</div>
+          <div style={{ fontSize: 20, fontWeight: 800, color: '#f59e0b', marginTop: 2 }}>{stats.maxExecutions} <span style={{ fontSize: 12, fontWeight: 500 }}>lượt</span></div>
+        </div>
+      </div>
+
+      {/* Line Chart */}
+      <div style={{ width: '100%', height: 260, marginTop: 10 }}>
+        {loading ? (
+          <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%' }}>
+            <div className="spinner" />
+          </div>
+        ) : (
+          <ResponsiveContainer width="100%" height={260}>
+            <LineChart data={lineData} margin={{ top: 15, right: 20, left: -20, bottom: 5 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke="rgba(0,0,0,0.06)" />
+              <XAxis dataKey="label" tick={{ fill: 'var(--text-secondary)', fontSize: 12 }} />
+              <YAxis allowDecimals={false} tick={{ fill: 'var(--text-secondary)', fontSize: 12 }} />
+              <Tooltip
+                contentStyle={{ background: '#fff', border: '1px solid var(--border-medium)', borderRadius: '8px', fontSize: '13px', boxShadow: 'var(--shadow-md)' }}
+                formatter={(v) => [`${v} lượt thực hiện`, 'Số task hoàn thành']}
+                labelFormatter={(label) => `📅 Mốc: ${label}`}
+              />
+              <Line
+                type="monotone"
+                dataKey="count"
+                stroke={strokeColor}
+                strokeWidth={3}
+                dot={{ r: 5, fill: strokeColor, stroke: '#fff', strokeWidth: 2 }}
+                activeDot={{ r: 7, fill: strokeColor }}
+              />
+            </LineChart>
+          </ResponsiveContainer>
+        )}
+      </div>
+    </div>
+  );
+}
 
 // ─── Main Visualization Page ──────────────────────────────────────────────────
 export default function VisPage() {
@@ -535,6 +645,9 @@ export default function VisPage() {
 
         {/* Goal Timeframe Visualizer (Tự động tính giờ tích lũy từ Task đính kèm) */}
         <GoalTimeframeVisualizer goals={filteredGoals} goalTimeStats={goalTimeStats} />
+
+        {/* Biểu đồ Đường: Thống kê SỐ LẦN thực hiện công việc (Cuối trang) */}
+        <TaskExecutionLineSection categories={categories} selectedCatId={selectedCatId} />
 
       </div>
 
