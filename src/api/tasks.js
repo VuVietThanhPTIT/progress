@@ -62,6 +62,8 @@ export function getDemoTasks() {
 // Helper to sanitize payload for Supabase (handles fallback if recurrence column is not in DB yet)
 function sanitizeTaskPayload(payload, userId) {
   const clean = { ...payload };
+  delete clean.id;
+  delete clean.location;
   if (userId) clean.user_id = userId;
   if (!clean.category_id) clean.category_id = null;
   if (!clean.goal_id) clean.goal_id = null;
@@ -97,10 +99,14 @@ export async function getTasksByDate(date) {
     return { data: _demoTasks.filter(isMatchingRecurrence), error: null };
   }
 
-  // Supabase Mode with Column Fallback
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return { data: [], error: null };
+
+  // Supabase Mode with Column Fallback & user_id filter
   let { data, error } = await supabase
     .from('tasks')
     .select('*, categories(*), goals(title, type)')
+    .eq('user_id', user.id)
     .or(`date.eq.${dateStr},recurrence.neq.none`)
     .order('start_time', { ascending: true, nullsFirst: false });
 
@@ -109,6 +115,7 @@ export async function getTasksByDate(date) {
     const res = await supabase
       .from('tasks')
       .select('*, categories(*), goals(title, type)')
+      .eq('user_id', user.id)
       .eq('date', dateStr)
       .order('start_time', { ascending: true, nullsFirst: false });
     data = res.data;
@@ -126,13 +133,18 @@ export async function getOverdueTasks() {
   if (isDemoMode) {
     return { data: _demoTasks.filter(t => t.date < todayStr && !t.is_completed), error: null };
   }
+
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return { data: [], error: null };
+
   const { data, error } = await supabase
     .from('tasks')
     .select('*, categories(*), goals(title, type)')
+    .eq('user_id', user.id)
     .lt('date', todayStr)
     .eq('is_completed', false)
     .order('date', { ascending: false });
-  return { data, error };
+  return { data: data || [], error };
 }
 
 export async function createTask(taskData) {
@@ -248,4 +260,56 @@ export async function rolloverTask(id, newDate) {
     .select()
     .single();
   return { data, error };
+}
+
+export async function importTasksBatch(tasksList) {
+  if (isDemoMode) {
+    const created = tasksList.map((t, idx) => ({
+      id: `t-imp-${Date.now()}-${idx}`,
+      user_id: 'demo-user-001',
+      is_completed: false,
+      rollover_count: 0,
+      recurrence: t.recurrence || 'none',
+      created_at: new Date().toISOString(),
+      original_date: t.date,
+      ...t,
+    }));
+    _demoTasks = [..._demoTasks, ...created];
+    return { data: created, error: null };
+  }
+
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return { data: null, error: { message: 'Chưa đăng nhập' } };
+
+  const payloads = tasksList.map(t => sanitizeTaskPayload(t, user.id));
+
+  // Chunk batch insert in groups of 50
+  const BATCH_SIZE = 50;
+  let allData = [];
+
+  for (let i = 0; i < payloads.length; i += BATCH_SIZE) {
+    const chunk = payloads.slice(i, i + BATCH_SIZE);
+    let { data, error } = await supabase.from('tasks').insert(chunk).select();
+
+    if (error && (error.message?.includes('recurrence') || error.code === 'PGRST204')) {
+      const fallbackChunk = chunk.map(p => {
+        const copy = { ...p };
+        delete copy.recurrence;
+        return copy;
+      });
+      const retry = await supabase.from('tasks').insert(fallbackChunk).select();
+      if (retry.error) {
+        console.error('Batch import retry error:', retry.error);
+        return { data: null, error: retry.error };
+      }
+      if (retry.data) allData = [...allData, ...retry.data];
+    } else if (error) {
+      console.error('Batch import error:', error);
+      return { data: null, error };
+    } else if (data) {
+      allData = [...allData, ...data];
+    }
+  }
+
+  return { data: allData, error: null };
 }
