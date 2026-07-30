@@ -13,9 +13,18 @@ function getEnvToken() {
   return '';
 }
 
+function getRepoInfo() {
+  try {
+    const remoteUrl = execSync('git remote get-url origin', { encoding: 'utf-8' }).trim();
+    const match = remoteUrl.match(/github\.com[/:]([^/]+\/[^/.]+)(\.git)?$/);
+    if (match) return match[1].replace(/\.git$/, '');
+  } catch (e) {}
+  return 'VuVietThanhPTIT/progress';
+}
+
 const TOKEN = getEnvToken();
-const REPO = 'VuVietThanhPTIT/progress';
-const PROXY = 'http://10.36.252.45:8080';
+const REPO = getRepoInfo();
+const PROXY = process.env.HTTP_PROXY || process.env.http_proxy || 'http://10.36.252.45:8080';
 
 const defaultFiles = [
   'src/api/tasks.js',
@@ -123,7 +132,7 @@ async function run() {
     console.error('❌ GITHUB_TOKEN not found in .env');
     process.exit(1);
   }
-  console.log(`🚀 Starting GitHub REST API Push Tool via Corporate Proxy...`);
+  console.log(`🚀 Starting GitHub REST API Push Tool via Corporate Proxy (${REPO})...`);
   const filesToSync = getChangedFiles();
   console.log(`📋 Found ${filesToSync.length} file(s) to sync.`);
   for (const f of filesToSync) {
