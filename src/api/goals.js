@@ -99,21 +99,28 @@ export async function getGoals(type) {
   if (isDemoMode) {
     return { data: _demoGoals.filter(g => !type || g.type === type), error: null };
   }
-  let query = supabase.from('goals').select('*, categories(*)');
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return { data: [], error: null };
+
+  let query = supabase.from('goals').select('*, categories(*)').eq('user_id', user.id);
   if (type) query = query.eq('type', type);
   const { data, error } = await query.order('created_at', { ascending: false });
-  return { data, error };
+  return { data: data || [], error };
 }
 
 export async function getAllGoals() {
   if (isDemoMode) {
     return { data: _demoGoals, error: null };
   }
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return { data: [], error: null };
+
   const { data, error } = await supabase
     .from('goals')
     .select('*, categories(*)')
+    .eq('user_id', user.id)
     .order('created_at', { ascending: false });
-  return { data, error };
+  return { data: data || [], error };
 }
 
 export async function createGoal(goalData) {
@@ -166,8 +173,13 @@ export async function getCategories() {
   if (isDemoMode) {
     return { data: _demoCategories, error: null };
   }
-  const { data, error } = await supabase.from('categories').select('*').order('created_at', { ascending: true });
-  return { data, error };
+  const { data: { user } } = await supabase.auth.getUser();
+  let query = supabase.from('categories').select('*');
+  if (user) {
+    query = query.or(`user_id.eq.${user.id},user_id.is.null`);
+  }
+  const { data, error } = await query.order('created_at', { ascending: true });
+  return { data: (data && data.length > 0) ? data : DEMO_CATEGORIES, error: null };
 }
 
 export async function createCategory(catData) {
