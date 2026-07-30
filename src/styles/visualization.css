@@ -1,0 +1,415 @@
+/* ─── Visualization page ─────────────────────────────────────────────────── */
+.vis-page {
+  max-width: 1100px;
+  margin: 0 auto;
+}
+
+/* ─── Stats row ──────────────────────────────────────────────────────────── */
+.stats-row {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--space-4);
+  margin-bottom: var(--space-6);
+}
+
+/* ─── Chart cards ────────────────────────────────────────────────────────── */
+.chart-card {
+  background: #fff;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  padding: var(--space-6);
+  margin-bottom: var(--space-4);
+  box-shadow: var(--shadow-sm);
+}
+
+.chart-card-header {
+  margin-bottom: var(--space-5);
+}
+
+.chart-card-title {
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: -0.2px;
+}
+
+.chart-card-desc {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-top: 3px;
+  line-height: 1.5;
+}
+
+/* ─── Habit strength gauge ───────────────────────────────────────────────── */
+.gauge-container {
+  display: flex;
+  align-items: center;
+  gap: var(--space-8);
+}
+
+.gauge-svg-wrapper {
+  position: relative;
+  flex-shrink: 0;
+}
+
+.gauge-label {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding-top: 20px;
+}
+
+.gauge-score {
+  font-size: 36px;
+  font-weight: 900;
+  letter-spacing: -2px;
+  line-height: 1;
+}
+
+.gauge-score-label {
+  font-size: 11px;
+  color: var(--text-muted);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+}
+
+.gauge-details {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.gauge-detail-item {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.gauge-detail-label {
+  font-size: 12px;
+  color: var(--text-muted);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.gauge-detail-value {
+  font-size: 18px;
+  font-weight: 700;
+}
+
+/* ─── Heatmap ────────────────────────────────────────────────────────────── */
+.heatmap-container {
+  overflow-x: auto;
+}
+
+.heatmap-grid {
+  display: flex;
+  gap: 3px;
+}
+
+.heatmap-week {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.heatmap-cell {
+  width: 14px;
+  height: 14px;
+  border-radius: 3px;
+  cursor: pointer;
+  transition: transform var(--transition-fast);
+}
+
+.heatmap-cell:hover { transform: scale(1.4); }
+
+.heatmap-legend {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-top: var(--space-3);
+  font-size: 11px;
+  color: var(--text-muted);
+  justify-content: flex-end;
+}
+
+.heatmap-month-labels {
+  display: flex;
+  font-size: 10px;
+  color: var(--text-muted);
+  margin-bottom: var(--space-2);
+  position: relative;
+}
+
+/* ─── Countdown page ─────────────────────────────────────────────────────── */
+.countdown-page {
+  max-width: 1000px;
+  margin: 0 auto;
+}
+
+.pinned-clock {
+  background: linear-gradient(135deg, var(--bg-card) 0%, rgba(99,102,241,0.05) 100%);
+  border: 1px solid var(--border-medium);
+  border-radius: var(--radius-xl);
+  padding: var(--space-10);
+  margin-bottom: var(--space-8);
+  text-align: center;
+  position: relative;
+  overflow: hidden;
+  cursor: pointer;
+  transition: all var(--transition-med);
+}
+
+.pinned-clock::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(ellipse at 50% 0%, rgba(99,102,241,0.08) 0%, transparent 70%);
+  pointer-events: none;
+}
+
+.pinned-clock:hover { border-color: var(--accent-primary); }
+
+.pinned-clock.urgent {
+  border-color: var(--danger);
+  background: linear-gradient(135deg, var(--bg-card) 0%, rgba(239,68,68,0.05) 100%);
+}
+
+.pinned-clock.urgent::before {
+  background: radial-gradient(ellipse at 50% 0%, rgba(239,68,68,0.1) 0%, transparent 70%);
+}
+
+.pinned-clock-category {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: 4px 12px;
+  border-radius: var(--radius-full);
+  font-size: 12px;
+  font-weight: 600;
+  margin-bottom: var(--space-4);
+}
+
+.pinned-clock-goal {
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--text-secondary);
+  margin-bottom: var(--space-6);
+}
+
+.pinned-clock-time {
+  font-size: clamp(48px, 8vw, 80px);
+  font-weight: 900;
+  letter-spacing: -4px;
+  line-height: 1;
+  background: linear-gradient(135deg, var(--text-primary), var(--text-secondary));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  margin-bottom: var(--space-4);
+}
+
+.pinned-clock.urgent .pinned-clock-time {
+  background: linear-gradient(135deg, var(--danger), #f87171);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.pinned-clock-units {
+  display: flex;
+  justify-content: center;
+  gap: var(--space-8);
+  font-size: 12px;
+  color: var(--text-muted);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 2px;
+  margin-top: -var(--space-2);
+}
+
+.pinned-clock-deadline {
+  font-size: 13px;
+  color: var(--text-muted);
+  margin-top: var(--space-4);
+}
+
+/* ─── Clock grid ─────────────────────────────────────────────────────────── */
+.clock-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: var(--space-4);
+}
+
+.clock-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  padding: var(--space-5);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  position: relative;
+  overflow: hidden;
+}
+
+.clock-card:hover {
+  border-color: var(--border-medium);
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-md);
+}
+
+.clock-card.urgent {
+  border-color: rgba(239,68,68,0.3);
+  background: rgba(239,68,68,0.04);
+}
+
+.clock-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: var(--space-3);
+}
+
+.clock-card-title {
+  font-size: 13px;
+  font-weight: 600;
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.clock-card-time {
+  font-size: 26px;
+  font-weight: 800;
+  letter-spacing: -1px;
+  line-height: 1;
+}
+
+.clock-card.urgent .clock-card-time { color: var(--danger); }
+
+.clock-card-deadline {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-top: var(--space-2);
+}
+
+/* ─── Goals page ─────────────────────────────────────────────────────────── */
+.goals-page {
+  max-width: 860px;
+  margin: 0 auto;
+}
+
+.goal-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  margin-bottom: var(--space-3);
+  overflow: hidden;
+  transition: border-color var(--transition-fast);
+}
+
+.goal-card:hover { border-color: var(--border-medium); }
+
+.goal-card-main {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  padding: var(--space-4) var(--space-5);
+  cursor: pointer;
+}
+
+.goal-card-left { flex: 1; min-width: 0; }
+
+.goal-card-title {
+  font-size: 15px;
+  font-weight: 600;
+  margin-bottom: var(--space-3);
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+
+.goal-card-progress {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.goal-progress-pct {
+  font-size: 13px;
+  font-weight: 700;
+  width: 36px;
+  text-align: right;
+  flex-shrink: 0;
+}
+
+.goal-card-right {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  flex-shrink: 0;
+}
+
+.goal-card-deadline {
+  font-size: 12px;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+/* ─── Goal children ──────────────────────────────────────────────────────── */
+.goal-children {
+  border-top: 1px solid var(--border-subtle);
+  padding: var(--space-3) var(--space-5);
+  background: rgba(255,255,255,0.01);
+}
+
+.goal-child {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-md);
+  transition: background var(--transition-fast);
+  cursor: pointer;
+}
+
+.goal-child:hover { background: var(--bg-hover); }
+
+.goal-child-title { flex: 1; font-size: 14px; font-weight: 500; }
+.goal-child-pct { font-size: 13px; font-weight: 700; color: var(--text-secondary); }
+
+/* ─── View tabs ──────────────────────────────────────────────────────────── */
+.view-tabs {
+  display: flex;
+  gap: var(--space-1);
+  padding: 4px;
+  background: rgba(255,255,255,0.04);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-subtle);
+}
+
+.view-tab {
+  padding: 6px 16px;
+  border-radius: 6px;
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  font-family: inherit;
+  transition: all var(--transition-fast);
+}
+.view-tab.active {
+  background: var(--accent-primary);
+  color: white;
+  box-shadow: 0 2px 8px rgba(99,102,241,0.35);
+}
+.view-tab:not(.active):hover { color: var(--text-primary); background: var(--bg-hover); }
