@@ -55,7 +55,7 @@ function getChangedFiles() {
     const lines = statusOutput.split('\n').filter(Boolean);
     const rawFiles = lines.map(line => line.trim().split(/\s+/)[1]).filter(Boolean);
     
-    let result = [];
+    let result = [...defaultFiles];
     for (const item of rawFiles) {
       if (item.includes('node_modules') || item.startsWith('.git') || item.includes('.env')) continue;
       if (fs.existsSync(item)) {
@@ -68,7 +68,7 @@ function getChangedFiles() {
       }
     }
     
-    return result.length > 0 ? Array.from(new Set(result)) : defaultFiles;
+    return Array.from(new Set(result));
   } catch (err) {
     return defaultFiles;
   }
